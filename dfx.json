@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "gasless-bridge-backend": {
+      "candid": "src/gasless-bridge-backend/gasless-bridge-backend.did",
+      "package": "gasless-bridge-backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
