@@ -227,6 +227,57 @@ fn get_reserve_status() -> ReserveStatus {
     })
 }
 
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct DetailedReserveStatus {
+    pub balance: u64,
+    pub locked: u64,
+    pub available: u64,
+    pub threshold_warning: u64,
+    pub threshold_critical: u64,
+    pub daily_volume: u64,
+    pub daily_limit: u64,
+    pub pending_withdrawals: u64,
+    pub utilization_percent: f64,    // locked / total * 100
+    pub health_status: String,       // "GOOD", "WARNING", "CRITICAL"
+    pub can_accept_quotes: bool,
+    pub last_topup: u64,
+}
+
+#[query]
+fn get_detailed_reserve_status() -> DetailedReserveStatus {
+    STATE.with(|state| {
+        let reserve = &state.borrow().reserve;
+        let utilization = if reserve.total_balance > 0 {
+            (reserve.locked_balance as f64 / reserve.total_balance as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        let health_status = if reserve.is_below_critical() {
+            "CRITICAL"
+        } else if reserve.is_below_warning() {
+            "WARNING"
+        } else {
+            "GOOD"
+        };
+        
+        DetailedReserveStatus {
+            balance: reserve.total_balance,
+            locked: reserve.locked_balance,
+            available: reserve.available_balance,
+            threshold_warning: reserve.threshold_warning,
+            threshold_critical: reserve.threshold_critical,
+            daily_volume: reserve.daily_volume,
+            daily_limit: reserve.daily_limit,
+            pending_withdrawals: reserve.pending_withdrawals,
+            utilization_percent: utilization,
+            health_status: health_status.to_string(),
+            can_accept_quotes: !reserve.is_below_critical(),
+            last_topup: reserve.last_topup,
+        }
+    })
+}
+
 #[query]
 fn get_reserve_status_formatted() -> String {
     STATE.with(|state| {
@@ -283,6 +334,97 @@ fn admin_add_reserve_funds(amount_wei: u64) -> Result<String, String> {
     });
     
     Ok(format!("✅ Added {} wei ({:.6} ETH) to reserve", amount_wei, amount_wei as f64 / 1e18))
+}
+
+#[update]
+fn admin_set_reserve_thresholds(warning_wei: u64, critical_wei: u64) -> Result<String, String> {
+    let caller_principal = caller();
+    
+    let is_admin = STATE.with(|state| {
+        state.borrow().is_admin(&caller_principal)
+    });
+    
+    if !is_admin {
+        return Err("Unauthorized: Only admins can set thresholds".to_string());
+    }
+    
+    if critical_wei >= warning_wei {
+        return Err("Critical threshold must be less than warning threshold".to_string());
+    }
+    
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
+        s.reserve.threshold_warning = warning_wei;
+        s.reserve.threshold_critical = critical_wei;
+    });
+    
+    Ok(format!(
+        "✅ Thresholds updated - Warning: {:.6} ETH, Critical: {:.6} ETH",
+        warning_wei as f64 / 1e18,
+        critical_wei as f64 / 1e18
+    ))
+}
+
+#[update]
+fn admin_set_daily_limit(limit_wei: u64) -> Result<String, String> {
+    let caller_principal = caller();
+    
+    let is_admin = STATE.with(|state| {
+        state.borrow().is_admin(&caller_principal)
+    });
+    
+    if !is_admin {
+        return Err("Unauthorized: Only admins can set daily limits".to_string());
+    }
+    
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
+        s.reserve.daily_limit = limit_wei;
+    });
+    
+    Ok(format!("✅ Daily limit set to {} wei ({:.6} ETH)", limit_wei, limit_wei as f64 / 1e18))
+}
+
+#[update]
+fn admin_emergency_pause() -> Result<String, String> {
+    let caller_principal = caller();
+    
+    let is_admin = STATE.with(|state| {
+        state.borrow().is_admin(&caller_principal)
+    });
+    
+    if !is_admin {
+        return Err("Unauthorized: Only admins can emergency pause".to_string());
+    }
+    
+    // Set critical threshold very high to effectively pause quote acceptance
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
+        s.reserve.threshold_critical = s.reserve.total_balance + 1;
+    });
+    
+    Ok("🚨 EMERGENCY PAUSE ACTIVATED - No new quotes will be accepted".to_string())
+}
+
+#[update]  
+fn admin_emergency_unpause() -> Result<String, String> {
+    let caller_principal = caller();
+    
+    let is_admin = STATE.with(|state| {
+        state.borrow().is_admin(&caller_principal)
+    });
+    
+    if !is_admin {
+        return Err("Unauthorized: Only admins can unpause".to_string());
+    }
+    
+    // Reset to default critical threshold
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
+        s.reserve.threshold_critical = 100_000_000_000_000_000; // 0.1 ETH
+    });
+    
+    Ok("✅ Emergency pause lifted - Quote acceptance resumed".to_string())
 }
 
 #[query]
@@ -447,6 +589,105 @@ fn add_test_reserve_funds() -> String {
     });
     
     format!("✅ Added {} wei ({:.6} ETH) to reserve for testing", amount, amount as f64 / 1e18)
+}
+
+// === RESERVE MONITORING & ALERTS ===
+
+#[query]
+fn check_reserve_health() -> String {
+    STATE.with(|state| {
+        let reserve = &state.borrow().reserve;
+        let utilization = if reserve.total_balance > 0 {
+            (reserve.locked_balance as f64 / reserve.total_balance as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        let mut alerts = Vec::new();
+        
+        if reserve.is_below_critical() {
+            alerts.push("🚨 CRITICAL: Reserve below critical threshold");
+        } else if reserve.is_below_warning() {
+            alerts.push("⚠️ WARNING: Reserve below warning threshold");
+        }
+        
+        if utilization > 80.0 {
+            alerts.push("⚠️ HIGH UTILIZATION: >80% of reserve locked");
+        }
+        
+        if reserve.daily_volume > reserve.daily_limit * 90 / 100 {
+            alerts.push("⚠️ DAILY LIMIT: >90% of daily volume used");
+        }
+        
+        if alerts.is_empty() {
+            format!(
+                "✅ Reserve Health: GOOD\n\
+                 💰 Available: {:.6} ETH\n\
+                 📊 Utilization: {:.1}%\n\
+                 📈 Daily Volume: {:.6} ETH",
+                reserve.available_balance as f64 / 1e18,
+                utilization,
+                reserve.daily_volume as f64 / 1e18
+            )
+        } else {
+            format!(
+                "⚠️ Reserve Alerts:\n{}\n\n\
+                 💰 Available: {:.6} ETH\n\
+                 📊 Utilization: {:.1}%\n\
+                 📈 Daily Volume: {:.6} ETH",
+                alerts.join("\n"),
+                reserve.available_balance as f64 / 1e18,
+                utilization,
+                reserve.daily_volume as f64 / 1e18
+            )
+        }
+    })
+}
+
+#[query]
+fn get_reserve_utilization() -> f64 {
+    STATE.with(|state| {
+        let reserve = &state.borrow().reserve;
+        if reserve.total_balance > 0 {
+            (reserve.locked_balance as f64 / reserve.total_balance as f64) * 100.0
+        } else {
+            0.0
+        }
+    })
+}
+
+#[query]
+fn can_accept_new_quotes() -> bool {
+    STATE.with(|state| {
+        let reserve = &state.borrow().reserve;
+        !reserve.is_below_critical()
+    })
+}
+
+#[query]
+fn estimate_reserve_runway() -> String {
+    STATE.with(|state| {
+        let reserve = &state.borrow().reserve;
+        
+        if reserve.daily_volume == 0 {
+            return "📊 Reserve Runway: No daily volume data".to_string();
+        }
+        
+        let avg_daily_consumption = reserve.daily_volume; // Simplified - would calculate actual average
+        let days_remaining = if avg_daily_consumption > 0 {
+            reserve.available_balance / avg_daily_consumption
+        } else {
+            0
+        };
+        
+        if days_remaining > 30 {
+            format!("✅ Reserve Runway: {}+ days (healthy)", days_remaining)
+        } else if days_remaining > 7 {
+            format!("⚠️ Reserve Runway: {} days (monitor)", days_remaining)
+        } else {
+            format!("🚨 Reserve Runway: {} days (urgent topup needed)", days_remaining)
+        }
+    })
 }
 
 // === TESTING & DEVELOPMENT ===
