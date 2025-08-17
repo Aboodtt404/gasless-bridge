@@ -1,5 +1,50 @@
-[workspace]
-members = [
-    "src/gasless-bridge-backend"
-]
-resolver = "2"
+[package]
+name = "gasless-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Core ICP dependencies
+candid = { workspace = true }
+ic-cdk = { workspace = true }
+ic-cdk-timers = { workspace = true }
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Cryptography and encoding
+hex = { workspace = true }
+sha3 = { workspace = true }
+
+# HTTP client for RPC calls
+ic-cdk-macros = "0.9"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time handling
+time = { version = "0.3", features = ["serde", "macros"] }
+
+# Stable storage
+ic-stable-structures = "0.6"
+
+# Logging
+ic-cdk = { version = "0.12", features = ["cdk-macros"] }
+
+# Configuration management
+toml = "0.8"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# EVM utilities
+ic-web3-rs = { workspace = true, optional = true }
+
+[features]
+default = []
+web3 = ["ic-web3-rs"]

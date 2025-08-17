@@ -1,8 +1,9 @@
 {
+  "version": 1,
   "canisters": {
-    "gasless-bridge-backend": {
-      "candid": "src/gasless-bridge-backend/gasless-bridge-backend.did",
-      "package": "gasless-bridge-backend",
+    "gasless-bridge": {
+      "candid": "src/gasless-bridge/gasless-bridge.did",
+      "package": "gasless-bridge",
       "type": "rust"
     }
   },
@@ -12,6 +13,10 @@
       "packtool": ""
     }
   },
-  "output_env_file": ".env",
-  "version": 1
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral"
+    }
+  }
 }

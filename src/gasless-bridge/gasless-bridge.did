@@ -1,0 +1,63 @@
+type QuoteStatus = variant {
+    Pending;
+    Settled;
+    Executed;
+    Expired;
+    Failed;
+};
+
+type SettlementStatus = variant {
+    Pending;
+    Confirmed;
+    Failed;
+};
+
+type Quote = record {
+    id : text;
+    amount : nat64;
+    destination : text;
+    chain_id : nat64;
+    estimated_gas : nat64;
+    base_fee : nat64;
+    priority_fee : nat64;
+    max_fee_per_gas : nat64;
+    net_delivery : nat64;
+    expiry : nat64;
+    status : QuoteStatus;
+};
+
+type Settlement = record {
+    id : text;
+    quote_id : text;
+    user : principal;
+    amount_paid : nat64;
+    timestamp : nat64;
+    status : SettlementStatus;
+};
+
+type ReserveStatus = record {
+    balance : nat64;
+    locked : nat64;
+    available : nat64;
+    threshold_warning : nat64;
+    threshold_critical : nat64;
+};
+
+type TransferReceipt = record {
+    quote_id : text;
+    tx_hash : text;
+    gas_used : nat64;
+    effective_fee : nat64;
+    final_delivered : nat64;
+    timestamp : nat64;
+};
+
+service : {
+    greet : (text) -> (text) query;
+    get_reserve_status : () -> (ReserveStatus) query;
+    test_base_rpc : () -> (text);
+    estimate_gas : (text, nat64) -> (text);
+    set_rpc_url : (text, text) -> (text);
+    get_admin_status : () -> (vec principal) query;
+    health_check : () -> (text) query;
+}

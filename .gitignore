@@ -1,25 +1,38 @@
-# Various IDEs and Editors
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IC/dfx
+.dfx/
+target/
+Cargo.lock
+
+# IDE files
 .vscode/
 .idea/
-**/*~
+*.swp
+*.swo
 
-# Mac OSX temporary files
+# OS files
 .DS_Store
-**/.DS_Store
+Thumbs.db
 
-# dfx temporary files
-.dfx/
+# Logs
+*.log
 
-# generated files
-**/declarations/
+# Private keys and secrets
+*.key
+*.pem
+secrets/
 
-# rust
-target/
+# Build artifacts
+*.wasm
 
-# frontend code
-node_modules/
-dist/
-.svelte-kit/
+# Test artifacts
+coverage/
+test-results/
 
-# environment variables
-.env
+# Backup files
+*.bak
+*.backup

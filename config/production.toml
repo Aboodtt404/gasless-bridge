@@ -1,0 +1,30 @@
+[network]
+name = "Base Mainnet"
+chain_id = 8453
+confirmation_blocks = 3
+
+[rpc]
+primary_url = "https://base-mainnet.g.alchemy.com/v2/YOUR_MAINNET_KEY"
+fallback_url = "https://base.llamarpc.com"
+public_url = "https://mainnet.base.org"
+timeout_seconds = 60
+max_retries = 5
+
+[gas]
+safety_margin_percent = 25
+max_priority_fee_gwei = 5.0
+max_base_fee_gwei = 500.0
+
+[reserves]
+minimum_balance_eth = 1.0
+warning_threshold_eth = 5.0
+critical_threshold_eth = 2.0
+
+[quotes]
+validity_duration_minutes = 5
+max_amount_eth = 10.0
+min_amount_eth = 0.01
+
+[logging]
+level = "info"
+enable_request_logging = false
