@@ -87,7 +87,7 @@ fn parse_fee_history(response: &str) -> Result<GasEstimate, String> {
     })
 }
 
-fn get_fallback_estimate() -> GasEstimate {
+pub fn get_fallback_estimate() -> GasEstimate {
     let base_fee = 100_000_000_000; // 100 Gwei conservative fallback
     let priority_fee = 5_000_000_000; // 5 Gwei
     let max_fee_per_gas = base_fee + priority_fee;

@@ -66,9 +66,7 @@ impl Transfer {
         self.gas_price = Some(receipt.effective_gas_price);
         self.block_number = Some(receipt.block_number);
         
-        if let Some(ref tx_hash) = receipt.transaction_hash.as_str() {
-            self.transaction_hash = Some(tx_hash.to_string());
-        }
+        self.transaction_hash = Some(receipt.transaction_hash.clone());
         
         self.receipt = Some(receipt);
     }
