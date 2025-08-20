@@ -116,6 +116,8 @@ service : {
     test_base_rpc : () -> (text);
     test_gas_estimation : () -> (text);
     test_settlement_flow : () -> (text);
+    test_enhanced_rpc_client : () -> (Result);
+    test_rpc_health_monitoring : () -> (Result);
     
     // === THRESHOLD ECDSA & ETHEREUM INTEGRATION ===
     get_bridge_ethereum_address : () -> (Result);

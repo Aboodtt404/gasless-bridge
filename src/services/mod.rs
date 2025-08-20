@@ -3,6 +3,7 @@
 pub mod gas_estimator;
 pub mod threshold_ecdsa;
 pub mod eth_transaction;
+pub mod rpc_client;
 
 // Re-export key functions
 pub use threshold_ecdsa::{get_canister_ethereum_address, test_threshold_ecdsa};

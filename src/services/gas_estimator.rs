@@ -1,4 +1,5 @@
 use candid::{CandidType, Deserialize};
+use super::rpc_client::{fetch_fee_history_enhanced};
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct GasEstimate {
@@ -17,42 +18,133 @@ pub struct FeeHistoryResponse {
     pub reward: Vec<Vec<String>>,
 }
 
+/// Enhanced gas estimation with multiple RPC endpoints and better parsing
 pub async fn estimate_gas_advanced() -> Result<GasEstimate, String> {
-    let request_body = r#"{"jsonrpc":"2.0","method":"eth_feeHistory","params":["0x4","latest",[25,50,75]],"id":1}"#;
-    
-    let request = ic_cdk::api::management_canister::http_request::CanisterHttpRequestArgument {
-        url: "https://sepolia.base.org".to_string(),
-        method: ic_cdk::api::management_canister::http_request::HttpMethod::POST,
-        body: Some(request_body.as_bytes().to_vec()),
-        max_response_bytes: Some(4096),
-        transform: None,
-        headers: vec![
-            ic_cdk::api::management_canister::http_request::HttpHeader {
-                name: "Content-Type".to_string(),
-                value: "application/json".to_string(),
-            },
-        ],
-    };
+    estimate_gas_for_chain("Base Sepolia").await
+}
 
-    match ic_cdk::api::management_canister::http_request::http_request(request, 25_000_000_000).await {
-        Ok((response,)) => {
-            let body = String::from_utf8_lossy(&response.body);
-            ic_cdk::println!("Fee history response: {}", body);
-            
-            // Parse the response (simplified - in production use proper JSON parsing)
-            parse_fee_history(&body)
+/// Estimate gas for specific chain using enhanced RPC client
+pub async fn estimate_gas_for_chain(chain: &str) -> Result<GasEstimate, String> {
+    ic_cdk::println!("🔥 Enhanced gas estimation for {} using multiple RPC endpoints", chain);
+    
+    match fetch_fee_history_enhanced(chain).await {
+        Ok(fee_history) => {
+            ic_cdk::println!("✅ Successfully fetched fee history with enhanced RPC client");
+            parse_fee_history_json(&fee_history)
         }
-        Err((r, m)) => {
-            ic_cdk::println!("Fee history request failed: {:?} - {}", r, m);
-            // Return conservative fallback estimate
+        Err(e) => {
+            ic_cdk::println!("⚠️ Enhanced RPC failed, using fallback: {}", e);
             Ok(get_fallback_estimate())
         }
     }
 }
 
+/// Enhanced fee history parsing with proper JSON handling
+fn parse_fee_history_json(fee_history: &serde_json::Value) -> Result<GasEstimate, String> {
+    ic_cdk::println!("🔍 Parsing real-time fee history data for accurate gas estimation");
+    
+    let result = fee_history.get("result")
+        .ok_or("No result in fee history response")?;
+    
+    // Extract base fees (latest block)
+    let base_fees = result.get("baseFeePerGas")
+        .and_then(|v| v.as_array())
+        .ok_or("No baseFeePerGas in response")?;
+    
+    let latest_base_fee_hex = base_fees.last()
+        .and_then(|v| v.as_str())
+        .ok_or("No latest base fee")?;
+    
+    let latest_base_fee = u64::from_str_radix(&latest_base_fee_hex[2..], 16)
+        .map_err(|e| format!("Failed to parse base fee: {}", e))?;
+    
+    // Extract rewards (priority fees) - use 75th percentile
+    let rewards = result.get("reward")
+        .and_then(|v| v.as_array())
+        .ok_or("No rewards in response")?;
+    
+    let mut priority_fees = Vec::new();
+    for reward_block in rewards {
+        if let Some(reward_array) = reward_block.as_array() {
+            // Get 75th percentile (index 2)
+            if let Some(priority_fee_hex) = reward_array.get(2).and_then(|v| v.as_str()) {
+                if let Ok(priority_fee) = u64::from_str_radix(&priority_fee_hex[2..], 16) {
+                    priority_fees.push(priority_fee);
+                }
+            }
+        }
+    }
+    
+    // Calculate median priority fee from recent blocks
+    let priority_fee = if !priority_fees.is_empty() {
+        priority_fees.sort();
+        priority_fees[priority_fees.len() / 2]
+    } else {
+        2_000_000_000 // 2 Gwei fallback
+    };
+    
+    // Calculate next block base fee with EIP-1559 formula
+    let gas_used_ratios = result.get("gasUsedRatio")
+        .and_then(|v| v.as_array())
+        .ok_or("No gasUsedRatio in response")?;
+    
+    let latest_gas_used_ratio = gas_used_ratios.last()
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.5); // 50% fallback
+    
+    // EIP-1559 base fee calculation for next block
+    let base_fee_next = if latest_gas_used_ratio > 0.5 {
+        // Increase base fee
+        let increase = ((latest_gas_used_ratio - 0.5) * 0.125) + 1.0;
+        (latest_base_fee as f64 * increase) as u64
+    } else {
+        // Decrease base fee
+        let decrease = 1.0 - ((0.5 - latest_gas_used_ratio) * 0.125);
+        (latest_base_fee as f64 * decrease) as u64
+    };
+    
+    // Add safety buffer to base fee (12.5% for block variations)
+    let base_fee_with_buffer = base_fee_next * 1125 / 1000;
+    
+    // Add safety buffer to priority fee (25% buffer)
+    let priority_fee_with_buffer = priority_fee * 125 / 100;
+    
+    // Max fee per gas with additional buffer
+    let max_fee_per_gas = base_fee_with_buffer + priority_fee_with_buffer + 5_000_000_000; // +5 Gwei buffer
+    
+    // Gas limit for ETH transfer
+    let gas_limit = 21_000;
+    
+    // Calculate total cost with safety margin
+    let estimated_cost = max_fee_per_gas * gas_limit;
+    let safety_margin = estimated_cost * 20 / 100; // 20% safety margin
+    let total_cost = estimated_cost + safety_margin;
+    
+    // Validate against reasonable caps
+    if max_fee_per_gas > 500_000_000_000 { // 500 Gwei emergency cap
+        return Err("Gas price extremely high, rejecting quote for safety".to_string());
+    }
+    
+    ic_cdk::println!(
+        "⛽ Real-time gas estimate: Base: {:.2} Gwei, Priority: {:.2} Gwei, Max: {:.2} Gwei",
+        base_fee_with_buffer as f64 / 1e9,
+        priority_fee_with_buffer as f64 / 1e9,
+        max_fee_per_gas as f64 / 1e9
+    );
+    
+    Ok(GasEstimate {
+        base_fee: base_fee_with_buffer,
+        priority_fee: priority_fee_with_buffer,
+        max_fee_per_gas,
+        gas_limit,
+        total_cost,
+        safety_margin,
+    })
+}
+
 fn parse_fee_history(_response: &str) -> Result<GasEstimate, String> {
-    // Simplified parsing - in production, use proper JSON parser
-    // For now, return conservative estimates
+    // Legacy parsing function - kept for compatibility
+    // Use parse_fee_history_json for enhanced parsing
     
     // Base fee: latest + 12.5% buffer for next block
     let base_fee = 50_000_000_000; // 50 Gwei conservative estimate
