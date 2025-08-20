@@ -91,12 +91,11 @@ impl EthereumTransaction {
         rlp_stream.append(&self.to.0.as_slice());
         rlp_stream.append(&self.value);
         rlp_stream.append(&self.data);
-        rlp_stream.append_list::<Vec<u8>, u8>(&[]); // access_list (empty)
+        rlp_stream.append_empty_data(); // access_list (empty)
 
         let encoded = rlp_stream.out();
         
-        // Create final signing hash: keccak256(0x02 || rlp_encoded)
-        let mut tx_bytes = vec![0x02]; // EIP-1559 transaction type
+        let mut tx_bytes = vec![0x02];
         tx_bytes.extend_from_slice(&encoded);
         
         let mut hasher = Keccak256::new();
@@ -106,8 +105,6 @@ impl EthereumTransaction {
         TransactionHash(hash.into())
     }
 
-    /// Create signed transaction from signature and recovery ID
-    /// This combines our transaction with the threshold ECDSA signature
     pub fn to_signed_transaction(
         &self,
         signature: &Signature,
@@ -146,7 +143,7 @@ impl EthereumTransaction {
         rlp_stream.append(&self.to.0.as_slice());
         rlp_stream.append(&self.value);
         rlp_stream.append(&self.data);
-        rlp_stream.append_list::<Vec<u8>, u8>(&[]); // access_list (empty)
+        rlp_stream.append_empty_data(); // access_list (empty)
         rlp_stream.append(&v);
         rlp_stream.append(&r);
         rlp_stream.append(&s);

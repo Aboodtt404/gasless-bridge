@@ -51,16 +51,16 @@ impl Quote {
         
         // Calculate fees with safety margin
         let safety_margin = gas_estimate * 20 / 100; // 20% safety margin
-        let total_cost = gas_estimate + safety_margin;
+        let _total_cost = gas_estimate + safety_margin; // Unused in gasless model
         let max_fee_per_gas = base_fee + priority_fee;
         
         Quote {
             id,
             user_principal,
-            amount_in: request.amount + total_cost, // User pays amount + gas costs
-            amount_out: request.amount,             // User receives exact amount requested
+            amount_in: request.amount,              // 🚀 GASLESS: User pays EXACTLY what they specify!
+            amount_out: request.amount,             // 🎯 Receiver gets EXACTLY what user intended!
             amount_requested: request.amount,
-            total_cost,
+            total_cost: 0,                          // 🌟 ZERO COST TO USER - Bridge subsidizes everything!
             gas_estimate,
             destination_address: request.destination_address,
             source_chain: "ICP".to_string(),
@@ -96,5 +96,39 @@ impl Quote {
     pub fn time_remaining(&self) -> i64 {
         let now = ic_cdk::api::time() / 1_000_000_000;
         (self.expires_at as i64) - (now as i64)
+    }
+    
+    /// Get the gas cost that the bridge will subsidize (for internal accounting)
+    /// This is the revolutionary part - bridge covers ALL gas costs!
+    pub fn get_bridge_subsidy(&self) -> u64 {
+        // Bridge pays: gas_estimate * max_fee_per_gas + safety_margin
+        let gas_cost = self.gas_estimate * self.max_fee_per_gas;
+        gas_cost + self.safety_margin
+    }
+    
+    /// Get total amount bridge needs to lock (delivery amount + gas subsidy)
+    /// This is what the bridge reserves need to cover
+    pub fn get_total_bridge_cost(&self) -> u64 {
+        self.amount_out + self.get_bridge_subsidy()
+    }
+    
+    /// Check if this quote uses the gasless model (zero cost to user)
+    pub fn is_gasless(&self) -> bool {
+        self.total_cost == 0
+    }
+    
+    /// Get user-friendly description of the gasless benefit
+    pub fn get_gasless_savings(&self) -> String {
+        let gas_savings = self.get_bridge_subsidy();
+        format!(
+            "💰 Gas Savings: {:.6} ETH\n\
+            🎯 You Pay: {:.6} ETH\n\
+            🎁 You Get: {:.6} ETH delivered\n\
+            🚀 Bridge Covers: {:.6} ETH in gas fees",
+            gas_savings as f64 / 1e18,
+            self.amount_in as f64 / 1e18,
+            self.amount_out as f64 / 1e18,
+            gas_savings as f64 / 1e18
+        )
     }
 }

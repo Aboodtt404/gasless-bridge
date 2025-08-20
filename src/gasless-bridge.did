@@ -1,63 +1,130 @@
-type QuoteStatus = variant {
-    Pending;
-    Settled;
-    Executed;
-    Expired;
-    Failed;
-};
-
-type SettlementStatus = variant {
-    Pending;
-    Confirmed;
-    Failed;
-};
+// HyperBridge - Revolutionary Gasless Cross-Chain Bridge
+// Powered by ICP Chain Fusion Technology
 
 type Quote = record {
     id : text;
-    amount : nat64;
-    destination : text;
-    chain_id : nat64;
-    estimated_gas : nat64;
+    user_principal : principal;
+    amount_in : nat64;
+    amount_out : nat64;
+    amount_requested : nat64;
+    total_cost : nat64;
+    gas_estimate : nat64;
+    destination_address : text;
+    source_chain : text;
+    destination_chain : text;
+    created_at : nat64;
+    expires_at : nat64;
     base_fee : nat64;
     priority_fee : nat64;
     max_fee_per_gas : nat64;
-    net_delivery : nat64;
-    expiry : nat64;
+    safety_margin : nat64;
     status : QuoteStatus;
+};
+
+type QuoteStatus = variant {
+    Active;
+    Expired;
+    Settled;
 };
 
 type Settlement = record {
     id : text;
     quote_id : text;
-    user : principal;
-    amount_paid : nat64;
-    timestamp : nat64;
+    user_principal : principal;
+    amount : nat64;
+    destination_address : text;
+    destination_chain : text;
+    payment_proof : text;
+    created_at : nat64;
     status : SettlementStatus;
+    gas_used : opt nat64;
+    transaction_hash : opt text;
+    retry_count : nat32;
+    last_error : opt text;
 };
 
-type ReserveStatus = record {
+type SettlementStatus = variant {
+    Pending;
+    Executing;
+    Completed;
+    Failed;
+};
+
+type ReserveStatus = variant {
+    Healthy;
+    Warning;
+    Critical;
+    Emergency;
+};
+
+type DetailedReserveStatus = record {
     balance : nat64;
     locked : nat64;
     available : nat64;
     threshold_warning : nat64;
     threshold_critical : nat64;
+    daily_volume : nat64;
+    daily_limit : nat64;
+    pending_withdrawals : nat64;
+    utilization_percent : float64;
+    health_status : text;
+    can_accept_quotes : bool;
+    last_topup : nat64;
 };
 
-type TransferReceipt = record {
-    quote_id : text;
-    tx_hash : text;
-    gas_used : nat64;
-    effective_fee : nat64;
-    final_delivered : nat64;
-    timestamp : nat64;
-};
+type Result = variant { Ok : text; Err : text };
+type Result_1 = variant { Ok : Quote; Err : text };
+type Result_2 = variant { Ok : Settlement; Err : text };
 
 service : {
-    greet : (text) -> (text) query;
+    // === CORE BRIDGE FUNCTIONALITY ===
+    
+    // Quote Generation (Revolutionary Gasless Model!)
+    request_quote : (nat64, text, text) -> (Result_1);
+    get_quote : (text) -> (opt Quote) query;
+    get_user_quotes : () -> (vec Quote) query;
+    estimate_quote_cost : (nat64) -> (Result);
+    check_quote_expiry : (text) -> (Result) query;
+    
+    // Settlement Processing
+    settle_quote : (text, text) -> (Result_2);
+    get_settlement : (text) -> (opt Settlement) query;
+    get_user_settlements : () -> (vec Settlement) query;
+    get_settlement_by_quote : (text) -> (opt Settlement) query;
+    get_settlement_statistics : () -> (text) query;
+    
+    // Reserve Management & Status
     get_reserve_status : () -> (ReserveStatus) query;
-    test_base_rpc : () -> (text);
-    estimate_gas : (text, nat64) -> (text);
-    set_rpc_url : (text, text) -> (text);
+    get_detailed_reserve_status : () -> (DetailedReserveStatus) query;
+    get_reserve_status_formatted : () -> (text) query;
+    check_reserve_health : () -> (text) query;
+    get_reserve_utilization : () -> (float64) query;
+    can_accept_new_quotes : () -> (bool) query;
+    estimate_reserve_runway : () -> (text) query;
+    
+    // === ADMIN FUNCTIONS ===
+    add_admin : (principal) -> (Result);
+    admin_add_reserve_funds : (nat64) -> (Result);
+    admin_set_reserve_thresholds : (nat64, nat64) -> (Result);
+    admin_set_daily_limit : (nat64) -> (Result);
+    admin_emergency_pause : () -> (Result);
+    admin_emergency_unpause : () -> (Result);
     get_admin_status : () -> (vec principal) query;
+    
+    // === TEST & DEVELOPMENT FUNCTIONS ===
+    add_test_reserve_funds : () -> (text);
+    test_base_rpc : () -> (text);
+    test_gas_estimation : () -> (text);
+    test_settlement_flow : () -> (text);
+    
+    // === THRESHOLD ECDSA & ETHEREUM INTEGRATION ===
+    get_bridge_ethereum_address : () -> (Result);
+    test_threshold_ecdsa_integration : () -> (Result);
+    test_transaction_building : () -> (Result);
+    test_gasless_bridge_demo : () -> (Result);
+    test_complete_gasless_settlement : () -> (Result);
+    
+    // === SYSTEM STATUS ===
     health_check : () -> (text) query;
+    get_bridge_status : () -> (text);
 }

@@ -124,6 +124,61 @@ impl ReserveState {
     pub fn is_below_critical(&self) -> bool {
         self.available_balance < self.threshold_critical
     }
+    
+    /// Lock funds for gasless delivery (amount + gas subsidy)
+    /// This is the key function for the gasless model!
+    pub fn lock_gasless_funds(&mut self, delivery_amount: u64, gas_subsidy: u64) -> Result<(), String> {
+        let total_required = delivery_amount + gas_subsidy; // Bridge pays both!
+        
+        if !self.can_lock(total_required) {
+            return Err(format!(
+                "Insufficient reserve for gasless delivery. Need: {:.6} ETH, Available: {:.6} ETH",
+                total_required as f64 / 1e18,
+                self.available_balance as f64 / 1e18
+            ));
+        }
+        
+        self.locked_balance += total_required;
+        self.available_balance = self.total_balance.saturating_sub(self.locked_balance);
+        
+        // Track daily gas subsidies for analytics
+        self.daily_volume += gas_subsidy;
+        
+        ic_cdk::println!(
+            "🚀 Gasless funds locked! Delivery: {:.6} ETH, Gas Subsidy: {:.6} ETH, Total: {:.6} ETH",
+            delivery_amount as f64 / 1e18,
+            gas_subsidy as f64 / 1e18,
+            total_required as f64 / 1e18
+        );
+        
+        Ok(())
+    }
+    
+    /// Check if bridge can afford to subsidize a gasless transaction
+    pub fn can_subsidize_gasless(&self, delivery_amount: u64, gas_subsidy: u64) -> bool {
+        let total_cost = delivery_amount + gas_subsidy;
+        self.can_lock(total_cost)
+    }
+    
+    /// Get daily gas subsidy spending (for profitability analytics)
+    pub fn get_daily_gas_subsidy(&self) -> u64 {
+        self.daily_volume // We're reusing daily_volume to track gas subsidies
+    }
+    
+    /// Calculate gasless bridge profitability metrics
+    pub fn get_gasless_metrics(&self) -> String {
+        format!(
+            "💰 Gasless Bridge Economics:\n\
+            📊 Daily Gas Subsidies: {:.6} ETH\n\
+            💪 Reserve Capacity: {:.6} ETH\n\
+            🎯 Gasless Transactions Affordable: ~{} more\n\
+            📈 Operational Efficiency: {}%",
+            self.daily_volume as f64 / 1e18,
+            self.available_balance as f64 / 1e18,
+            if self.daily_volume > 0 { self.available_balance / (self.daily_volume / 100) } else { 0 },
+            if self.total_balance > 0 { (self.available_balance * 100) / self.total_balance } else { 0 }
+        )
+    }
 }
 
 impl Default for BridgeConfig {
