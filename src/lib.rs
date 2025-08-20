@@ -9,7 +9,7 @@ use candid::{CandidType, Deserialize};
 use std::cell::RefCell;
 
 // Import our new types and services
-use crate::types::{Quote, QuoteRequest, QuoteStatus, Settlement, Transfer};
+use crate::types::{Quote, QuoteRequest, Settlement};
 use crate::storage::state::BridgeState;
 use crate::services::gas_estimator::{estimate_gas_advanced, validate_gas_estimate};
 
@@ -406,7 +406,7 @@ fn admin_emergency_pause() -> Result<String, String> {
     Ok("🚨 EMERGENCY PAUSE ACTIVATED - No new quotes will be accepted".to_string())
 }
 
-#[update]  
+#[update]
 fn admin_emergency_unpause() -> Result<String, String> {
     let caller_principal = caller();
     
@@ -443,7 +443,7 @@ async fn settle_quote(quote_id: String, payment_proof: String) -> Result<Settlem
     let caller_principal = caller();
     
     // 1. QUOTE VALIDATION
-    let mut quote = STATE.with(|state| {
+    let quote = STATE.with(|state| {
         state.borrow().get_quote(&quote_id)
     }).ok_or("Quote not found")?;
     

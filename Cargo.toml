@@ -19,3 +19,6 @@ serde_json = "1.0"
 # Utilities
 hex = "0.4"
 anyhow = "1.0"
+
+# Stable storage
+ic-stable-structures = "0.6"
