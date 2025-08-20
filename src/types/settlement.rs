@@ -18,7 +18,7 @@ pub struct Settlement {
     pub error_message: Option<String>, // Error details if failed
 }
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Clone, Debug, PartialEq)]
 pub enum SettlementStatus {
     Pending,    // Settlement created, waiting for execution
     Executing,  // Transaction being broadcast

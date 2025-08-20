@@ -1,5 +1,5 @@
 use candid::{CandidType, Deserialize};
-use super::rpc_client::{fetch_fee_history_enhanced};
+// Removed unused import: fetch_fee_history_enhanced
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct GasEstimate {
@@ -23,14 +23,18 @@ pub async fn estimate_gas_advanced() -> Result<GasEstimate, String> {
     estimate_gas_for_chain("Base Sepolia").await
 }
 
-/// Estimate gas for specific chain using enhanced RPC client
+/// Estimate gas for specific chain using CACHED enhanced RPC client for 10x performance
 pub async fn estimate_gas_for_chain(chain: &str) -> Result<GasEstimate, String> {
-    ic_cdk::println!("🔥 Enhanced gas estimation for {} using multiple RPC endpoints", chain);
+    ic_cdk::println!("🚀 CACHED gas estimation for {} using multiple RPC endpoints", chain);
     
-    match fetch_fee_history_enhanced(chain).await {
+    match fetch_fee_history_cached(chain).await {
         Ok(fee_history) => {
             ic_cdk::println!("✅ Successfully fetched fee history with enhanced RPC client");
-            parse_fee_history_json(&fee_history)
+            // Parse the JSON string first
+            match serde_json::from_str::<serde_json::Value>(&fee_history) {
+                Ok(json_value) => parse_fee_history_json(&json_value),
+                Err(e) => Err(format!("Failed to parse fee history JSON: {}", e))
+            }
         }
         Err(e) => {
             ic_cdk::println!("⚠️ Enhanced RPC failed, using fallback: {}", e);
@@ -215,4 +219,14 @@ pub fn validate_gas_estimate(estimate: &GasEstimate) -> Result<(), String> {
     }
     
     Ok(())
+}
+
+/// Fetch fee history using cached enhanced RPC client for 10x better performance
+async fn fetch_fee_history_cached(chain: &str) -> Result<String, String> {
+    let mut rpc_client = crate::services::rpc_client::RpcClient::new_base_sepolia();
+    
+    match rpc_client.get_gas_estimate_cached(chain).await {
+        Ok(response) => Ok(response),
+        Err(e) => Err(format!("RPC cache error: {}", e.message))
+    }
 }

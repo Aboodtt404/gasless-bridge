@@ -119,6 +119,20 @@ service : {
     test_enhanced_rpc_client : () -> (Result);
     test_rpc_health_monitoring : () -> (Result);
     
+    // === COMPREHENSIVE TESTING SUITE (PHASE 5) ===
+    // Performance Monitoring & Cache Management (Phase 5.3)
+    get_rpc_cache_stats : () -> (Result) query;
+    clear_rpc_cache : () -> (Result);
+    invalidate_gas_cache : () -> (Result);
+
+    // Test Framework (Phase 5.1) 
+    run_unit_tests : () -> (Result);
+    run_integration_tests : () -> (Result);
+    run_security_tests : () -> (Result);
+    run_edge_case_tests : () -> (Result);
+    run_performance_tests : () -> (Result);
+    run_comprehensive_test_suite : () -> (Result);
+    
     // === THRESHOLD ECDSA & ETHEREUM INTEGRATION ===
     get_bridge_ethereum_address : () -> (Result);
     test_threshold_ecdsa_integration : () -> (Result);

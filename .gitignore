@@ -36,3 +36,9 @@ test-results/
 # Backup files
 *.bak
 *.backup
+src/tests/security_tests.rs
+src/tests/performance_tests.rs
+.gitignore
+src/tests/edge_case_tests.rs
+src/tests/integration_tests.rs
+src/tests/unit_tests.rs

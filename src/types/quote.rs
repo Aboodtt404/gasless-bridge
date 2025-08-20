@@ -21,7 +21,7 @@ pub struct Quote {
     pub status: QuoteStatus,          // Current status of the quote
 }
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Clone, Debug, PartialEq)]
 pub enum QuoteStatus {
     Active,    // Quote is valid and can be settled
     Settled,   // Quote has been settled (payment received)

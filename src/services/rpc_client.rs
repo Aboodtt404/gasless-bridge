@@ -1,10 +1,10 @@
-// Enhanced RPC Client with Multiple Endpoints and Error Handling
-// Phase 4.4: HTTP Outcalls Enhancement
+
 
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::management_canister::http_request::{
     CanisterHttpRequestArgument, HttpHeader, HttpMethod, http_request
 };
+use super::rpc_cache::{RpcCache, CacheStats, ttl};
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct RpcEndpoint {
@@ -37,6 +37,7 @@ pub struct RpcClient {
     endpoints: Vec<RpcEndpoint>,
     timeout_cycles: u128,
     max_response_bytes: u64,
+    cache: RpcCache,
 }
 
 impl RpcClient {
@@ -85,6 +86,7 @@ impl RpcClient {
             endpoints,
             timeout_cycles: 25_000_000_000u128, // 25B cycles
             max_response_bytes: 4096,
+            cache: RpcCache::new(100), // Cache up to 100 responses
         }
     }
 
@@ -223,6 +225,96 @@ impl RpcClient {
     }
 
     /// Get endpoint health status
+    /// Get cached gas estimation with automatic cache management
+    pub async fn get_gas_estimate_cached(&mut self, chain: &str) -> Result<String, RpcError> {
+        let cache_key = RpcCache::gas_estimation_key(chain);
+        
+        // Try cache first
+        if let Some(cached_response) = self.cache.get(&cache_key) {
+            return Ok(cached_response);
+        }
+        
+        // Cache miss - fetch fresh data
+        let params = serde_json::json!([10, "latest", []]);
+        match self.call_with_failover("eth_feeHistory", params).await {
+            Ok(response) => {
+                // Cache the response
+                self.cache.set(cache_key, response.body.clone(), ttl::GAS_ESTIMATE);
+                Ok(response.body)
+            }
+            Err(e) => Err(e)
+        }
+    }
+
+    /// Get cached nonce with automatic cache management
+    pub async fn get_nonce_cached(&mut self, address: &str, chain: &str) -> Result<u64, RpcError> {
+        let cache_key = RpcCache::nonce_key(address, chain);
+        
+        // Try cache first
+        if let Some(cached_response) = self.cache.get(&cache_key) {
+            // Parse cached nonce
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cached_response) {
+                if let Some(nonce_hex) = json.get("result").and_then(|v| v.as_str()) {
+                    if let Ok(nonce) = u64::from_str_radix(&nonce_hex[2..], 16) {
+                        return Ok(nonce);
+                    }
+                }
+            }
+        }
+        
+        // Cache miss - fetch fresh data
+        let params = serde_json::json!([address, "pending"]);
+        match self.call_with_failover("eth_getTransactionCount", params).await {
+            Ok(response) => {
+                // Parse nonce
+                let json: serde_json::Value = serde_json::from_str(&response.body)
+                    .map_err(|e| RpcError {
+                        endpoint: "cache".to_string(),
+                        error_type: "ParseError".to_string(),
+                        message: format!("Failed to parse nonce response: {}", e),
+                        retry_after: None,
+                    })?;
+                
+                let nonce_hex = json.get("result")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| RpcError {
+                        endpoint: "cache".to_string(),
+                        error_type: "DataError".to_string(),
+                        message: "No nonce in response".to_string(),
+                        retry_after: None,
+                    })?;
+                
+                let nonce = u64::from_str_radix(&nonce_hex[2..], 16)
+                    .map_err(|e| RpcError {
+                        endpoint: "cache".to_string(),
+                        error_type: "ParseError".to_string(),
+                        message: format!("Failed to parse nonce hex: {}", e),
+                        retry_after: None,
+                    })?;
+                
+                // Cache the response
+                self.cache.set(cache_key, response.body, ttl::NONCE);
+                Ok(nonce)
+            }
+            Err(e) => Err(e)
+        }
+    }
+
+    /// Get cache statistics for monitoring
+    pub fn get_cache_stats(&self) -> CacheStats {
+        self.cache.get_stats()
+    }
+
+    /// Manually invalidate gas estimate cache (call after detecting new block)
+    pub fn invalidate_gas_cache(&mut self) {
+        self.cache.invalidate_gas_estimates();
+    }
+
+    /// Cleanup expired cache entries (call periodically)
+    pub fn cleanup_cache(&mut self) {
+        self.cache.cleanup_expired();
+    }
+
     pub fn get_health_status(&self) -> String {
         let total = self.endpoints.len();
         let active = self.endpoints.iter().filter(|e| e.is_active).count();
