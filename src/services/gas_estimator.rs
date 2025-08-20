@@ -50,7 +50,7 @@ pub async fn estimate_gas_advanced() -> Result<GasEstimate, String> {
     }
 }
 
-fn parse_fee_history(response: &str) -> Result<GasEstimate, String> {
+fn parse_fee_history(_response: &str) -> Result<GasEstimate, String> {
     // Simplified parsing - in production, use proper JSON parser
     // For now, return conservative estimates
     

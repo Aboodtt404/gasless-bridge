@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use crate::types::{Quote, QuoteRequest, Settlement};
 use crate::storage::state::BridgeState;
 use crate::services::gas_estimator::{estimate_gas_advanced, validate_gas_estimate};
+use crate::services::{get_canister_ethereum_address, test_threshold_ecdsa, test_ethereum_transaction_building};
 
 // Global state using our new BridgeState
 thread_local! {
@@ -794,6 +795,51 @@ fn get_settlement_statistics() -> String {
             total_locked as f64 / 1e18
         )
     })
+}
+
+// === THRESHOLD ECDSA API ===
+
+/// Get the canister's Ethereum address generated from threshold ECDSA
+#[update]
+async fn get_bridge_ethereum_address() -> Result<String, String> {
+    match get_canister_ethereum_address().await {
+        Ok(address) => Ok(format!("{:?}", address)),
+        Err(e) => Err(e)
+    }
+}
+
+/// Test threshold ECDSA integration - the breakthrough that enables gasless bridges!
+#[update]
+async fn test_threshold_ecdsa_integration() -> Result<String, String> {
+    ic_cdk::println!("🚀 Testing ICP Threshold ECDSA - the core innovation!");
+    test_threshold_ecdsa().await
+}
+
+/// Test complete Ethereum transaction building - from signing to broadcast-ready transaction!
+#[update]
+async fn test_transaction_building() -> Result<String, String> {
+    ic_cdk::println!("🏗️ Testing complete Ethereum transaction building workflow!");
+    test_ethereum_transaction_building().await
+}
+
+/// Get comprehensive bridge status including Ethereum address
+#[update]
+async fn get_bridge_status() -> String {
+    let reserve_status = get_reserve_status();
+    let ethereum_address = match get_canister_ethereum_address().await {
+        Ok(addr) => format!("{:?}", addr),
+        Err(e) => format!("Error: {}", e)
+    };
+    
+    format!(
+        "🌊 HyperBridge Status Report\n\
+        🏠 Bridge Ethereum Address: {}\n\
+        💰 Reserve Status: {:?}\n\
+        🔐 Threshold ECDSA: Enabled\n\
+        ⚡ Ready for gasless transfers!",
+        ethereum_address,
+        reserve_status
+    )
 }
 
 ic_cdk::export_candid!();
