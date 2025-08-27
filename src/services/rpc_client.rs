@@ -246,6 +246,43 @@ impl RpcClient {
         }
     }
 
+    /// Broadcast a signed Ethereum transaction to the network
+    /// This is the final step in the ckETH → ETH flow!
+    pub async fn broadcast_transaction(&mut self, raw_transaction: &str, chain: &str) -> Result<String, RpcError> {
+        ic_cdk::println!("📡 Broadcasting transaction to {}: {}", chain, raw_transaction);
+        
+        let params = serde_json::json!([raw_transaction]);
+        
+        match self.call_with_failover("eth_sendRawTransaction", params).await {
+            Ok(response) => {
+                // Parse transaction hash from response
+                let json: serde_json::Value = serde_json::from_str(&response.body)
+                    .map_err(|e| RpcError {
+                        endpoint: "broadcast".to_string(),
+                        error_type: "ParseError".to_string(),
+                        message: format!("Failed to parse broadcast response: {}", e),
+                        retry_after: None,
+                    })?;
+                
+                let tx_hash = json.get("result")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| RpcError {
+                        endpoint: "broadcast".to_string(),
+                        error_type: "DataError".to_string(),
+                        message: "No transaction hash in broadcast response".to_string(),
+                        retry_after: None,
+                    })?;
+                
+                ic_cdk::println!("✅ Transaction broadcast successful! Hash: {}", tx_hash);
+                Ok(tx_hash.to_string())
+            }
+            Err(e) => {
+                ic_cdk::println!("❌ Transaction broadcast failed: {:?}", e);
+                Err(e)
+            }
+        }
+    }
+
     /// Get cached nonce with automatic cache management
     pub async fn get_nonce_cached(&mut self, address: &str, chain: &str) -> Result<u64, RpcError> {
         let cache_key = RpcCache::nonce_key(address, chain);
@@ -427,4 +464,20 @@ pub async fn broadcast_transaction_enhanced(raw_tx: &str, chain: &str) -> Result
             Err(format!("Failed to broadcast transaction: {}", error.message))
         }
     }
+}
+
+/// Public API functions
+
+/// Broadcast a signed Ethereum transaction
+pub async fn broadcast_ethereum_transaction(raw_tx: &str, chain: &str) -> Result<String, String> {
+    let mut client = RpcClient::new_base_sepolia();
+    client.broadcast_transaction(raw_tx, chain)
+        .await
+        .map_err(|e| format!("Broadcast failed: {}", e.message))
+}
+
+/// Test the RPC client with a simple health check
+pub async fn test_rpc_client_health() -> Result<String, String> {
+    let client = RpcClient::new_base_sepolia();
+    Ok(client.get_health_status())
 }

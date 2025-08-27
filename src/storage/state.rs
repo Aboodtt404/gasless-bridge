@@ -1,6 +1,7 @@
 use candid::{CandidType, Deserialize};
 use std::collections::HashMap;
 use crate::types::{Quote, Settlement, Transfer};
+use crate::services::chain_key_tokens::ChainKeyTokenService;
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct BridgeState {
@@ -10,6 +11,7 @@ pub struct BridgeState {
     pub reserve: ReserveState,
     pub admins: Vec<candid::Principal>,
     pub config: BridgeConfig,
+    pub chain_key_service: ChainKeyTokenService, // 🪙 Chain-key token service
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
@@ -44,6 +46,7 @@ impl BridgeState {
             reserve: ReserveState::new(),
             admins: Vec::new(),
             config: BridgeConfig::default(),
+            chain_key_service: ChainKeyTokenService::new(), // Initialize the new field
         }
     }
     

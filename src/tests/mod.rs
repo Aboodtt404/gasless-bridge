@@ -4,8 +4,9 @@
 pub mod unit_tests;
 pub mod integration_tests;
 pub mod security_tests;
-pub mod performance_tests;
 pub mod edge_case_tests;
+pub mod performance_tests;
+pub mod chain_key_tests; // 🪙 Chain-key token tests
 
 use candid::Principal;
 use crate::types::{Quote, QuoteStatus, Settlement, SettlementStatus};

@@ -297,7 +297,7 @@ impl EthTransactionBuilder {
         let (signature, recovery_id) = crate::services::threshold_ecdsa::sign_ethereum_transaction_hash(signing_hash).await?;
         
         // 5. Create signed transaction
-        let signed_tx = transaction.to_signed_transaction(&signature, &recovery_id, from_address)?;
+        let signed_tx = transaction.to_signed_transaction(&signature, &recovery_id, from_address.clone())?;
         
         ic_cdk::println!("✅ Bridge delivery transaction built successfully!");
         Ok(signed_tx)
@@ -383,4 +383,107 @@ pub async fn build_signed_bridge_transaction(
 /// Test the transaction building workflow
 pub async fn test_ethereum_transaction_building() -> Result<String, String> {
     EthTransactionBuilder::test_transaction_building().await
+}
+
+/// Complete bridge transaction execution
+/// This is the holy grail - the complete ckETH → ETH flow!
+pub async fn execute_bridge_transaction(
+    recipient: EthereumAddress,
+    amount: u64,
+    gas_estimate: GasEstimate,
+) -> Result<String, String> {
+    ic_cdk::println!("🚀 Executing complete bridge transaction: {} wei to {}", amount, recipient);
+    
+    // 1. Get our canister's Ethereum address
+    let from_address = crate::services::threshold_ecdsa::get_canister_ethereum_address().await?;
+    ic_cdk::println!("📤 From address: {}", from_address);
+    
+    // 2. Get current nonce for our address
+    let mut rpc_client = crate::services::rpc_client::RpcClient::new_base_sepolia();
+    let nonce = rpc_client.get_nonce_cached(&from_address.to_string(), "base_sepolia").await
+        .map_err(|e| format!("Failed to get nonce: {}", e.message))?;
+    ic_cdk::println!("🔢 Current nonce: {}", nonce);
+    
+    // 3. Build the transaction
+    let transaction = EthereumTransaction::new_bridge_delivery(recipient.clone(), amount, nonce, &gas_estimate);
+    ic_cdk::println!("🏗️ Transaction built successfully");
+    
+    // 4. Validate transaction
+    transaction.validate()?;
+    ic_cdk::println!("✅ Transaction validation passed");
+    
+    // 5. Get signing hash
+    let signing_hash = transaction.get_signing_hash();
+    ic_cdk::println!("🔐 Signing hash: {}", hex::encode(signing_hash.0));
+    
+    // 6. Sign with threshold ECDSA
+    let (signature, recovery_id) = crate::services::threshold_ecdsa::sign_ethereum_transaction_hash(signing_hash).await?;
+    ic_cdk::println!("✍️ Transaction signed with recovery ID: {}", recovery_id.serialize());
+    
+    // 7. Create signed transaction
+    let signed_tx = transaction.to_signed_transaction(&signature, &recovery_id, from_address.clone())?;
+    ic_cdk::println!("📦 Signed transaction created: {}", signed_tx.transaction_hash);
+    
+    // 8. Convert to hex string for broadcasting
+    let raw_tx_hex = format!("0x{}", hex::encode(&signed_tx.raw_transaction));
+    ic_cdk::println!("📡 Raw transaction ({} bytes): {}", signed_tx.raw_transaction.len(), raw_tx_hex);
+    
+    // 9. Broadcast to Ethereum network
+    let tx_hash = crate::services::rpc_client::broadcast_ethereum_transaction(&raw_tx_hex, "base_sepolia").await?;
+    ic_cdk::println!("✅ Transaction broadcast successful! Hash: {}", tx_hash);
+    
+    let result = format!(
+        "🎉 Bridge Transaction Executed Successfully!\n\
+         \n\
+         📤 From: {}\n\
+         📥 To: {}\n\
+         💰 Amount: {} wei\n\
+         ⛽ Gas Limit: {}\n\
+         💸 Max Fee: {} Gwei\n\
+         \n\
+         🔐 Signature Details:\n\
+         ✍️ Recovery ID: {}\n\
+         📝 Signature: {}\n\
+         \n\
+         📡 Network Details:\n\
+         🔗 Transaction Hash: {}\n\
+         🌐 Network: Base Sepolia\n\
+         ✅ Status: Broadcast Successful!\n\
+         \n\
+         🎯 This completes the ckETH → ETH flow!",
+        from_address,
+        recipient,
+        amount,
+        gas_estimate.gas_limit,
+        gas_estimate.max_fee_per_gas / 1_000_000_000,
+        recovery_id.serialize(),
+        hex::encode(signature.serialize()),
+        tx_hash
+    );
+    
+    ic_cdk::println!("{}", result);
+    Ok(result)
+}
+
+/// Test the complete bridge transaction flow
+pub async fn test_complete_bridge_flow() -> Result<String, String> {
+    ic_cdk::println!("🧪 Testing complete bridge transaction flow...");
+    
+    // Create a test recipient address
+    let test_recipient = EthereumAddress([0x42u8; 20]); // Test address
+    
+    // Create a test gas estimate
+    let gas_estimate = GasEstimate {
+        gas_limit: 21000,
+        max_fee_per_gas: 20_000_000_000, // 20 Gwei
+        priority_fee: 1_000_000_000,     // 1 Gwei
+        total_cost: 420_000_000_000, // 21000 * 20 Gwei
+        base_fee: 15_000_000_000,        // 15 Gwei base fee
+        safety_margin: 5_000_000_000,    // 5 Gwei safety margin
+    };
+    
+    // Test with a small amount (0.001 ETH)
+    let test_amount = 1_000_000_000_000_000; // 0.001 ETH in wei
+    
+    execute_bridge_transaction(test_recipient, test_amount, gas_estimate).await
 }
