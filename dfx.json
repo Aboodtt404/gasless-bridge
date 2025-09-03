@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "canisters": {
+    "gasless-bridge": {
+      "type": "rust",
+      "package": "gasless-bridge",
+      "candid": "gasless-bridge/src/gasless-bridge.did"
+    },
+    "frontend": {
+      "type": "assets",
+      "source": ["frontend/dist/"]
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral"
+    }
+  }
+}

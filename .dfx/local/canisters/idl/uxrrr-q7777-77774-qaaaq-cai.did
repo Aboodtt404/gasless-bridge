@@ -1,0 +1,368 @@
+// HyperBridge - Revolutionary Gasless Cross-Chain Bridge
+// Powered by ICP Chain Fusion Technology
+
+type Quote = record {
+    id : text;
+    user_principal : principal;
+    amount_in : nat64;
+    amount_out : nat64;
+    amount_requested : nat64;
+    total_cost : nat64;
+    gas_estimate : nat64;
+    destination_address : text;
+    source_chain : text;
+    destination_chain : text;
+    created_at : nat64;
+    expires_at : nat64;
+    base_fee : nat64;
+    priority_fee : nat64;
+    max_fee_per_gas : nat64;
+    safety_margin : nat64;
+    status : QuoteStatus;
+};
+
+type QuoteStatus = variant {
+    Active;
+    Expired;
+    Settled;
+};
+
+type Settlement = record {
+    id : text;
+    quote_id : text;
+    user_principal : principal;
+    amount : nat64;
+    destination_address : text;
+    destination_chain : text;
+    payment_proof : text;
+    created_at : nat64;
+    status : SettlementStatus;
+    gas_used : opt nat64;
+    transaction_hash : opt text;
+    retry_count : nat32;
+    last_error : opt text;
+};
+
+type SettlementStatus = variant {
+    Pending;
+    Executing;
+    Completed;
+    Failed;
+};
+
+type ReserveStatus = variant {
+    Healthy;
+    Warning;
+    Critical;
+    Emergency;
+};
+
+type DetailedReserveStatus = record {
+    balance : nat64;
+    locked : nat64;
+    available : nat64;
+    threshold_warning : nat64;
+    threshold_critical : nat64;
+    daily_volume : nat64;
+    daily_limit : nat64;
+    pending_withdrawals : nat64;
+    utilization_percent : float64;
+    health_status : text;
+    can_accept_quotes : bool;
+    last_topup : nat64;
+};
+
+type Result = variant { Ok : text; Err : text };
+type Result_1 = variant { Ok : Quote; Err : text };
+type Result_2 = variant { Ok : Settlement; Err : text };
+
+// Bridge Configuration
+type BridgeConfig = record {
+    max_quote_amount: nat64;
+    min_quote_amount: nat64;
+    quote_validity_minutes: nat64;
+    max_gas_price: nat64;
+    safety_margin_percent: nat32;
+    supported_chains: vec text;
+};
+
+// Chain-Key Token Types
+type ChainKeyTokenType = variant {
+    ckETH;
+    ckUSDC;
+    ckUSDT;
+    ckDAI;
+    ckWBTC;
+    Custom: text;
+};
+
+type ChainKeyTokenConfig = record {
+    token_type: ChainKeyTokenType;
+    ethereum_address: text;
+    decimals: nat8;
+    min_amount: nat64;
+    max_amount: nat64;
+    gas_limit: nat64;
+    is_active: bool;
+};
+
+type ChainKeyTokenBalance = record {
+    token_type: ChainKeyTokenType;
+    available_balance: nat64;
+    locked_balance: nat64;
+    total_supply: nat64;
+    last_operation: nat64;
+};
+
+type MintOperationStatus = variant {
+    Pending;
+    Verifying;
+    Completed;
+    Failed;
+};
+
+type ChainKeyMintOperation = record {
+    id: text;
+    user_principal: principal;
+    token_type: ChainKeyTokenType;
+    amount: nat64;
+    ethereum_tx_hash: text;
+    status: MintOperationStatus;
+    created_at: nat64;
+    completed_at: opt nat64;
+};
+
+type BurnOperationStatus = variant {
+    Pending;
+    Burning;
+    Executing;
+    Completed;
+    Failed;
+};
+
+type ChainKeyBurnOperation = record {
+    id: text;
+    user_principal: principal;
+    token_type: ChainKeyTokenType;
+    amount: nat64;
+    destination_address: text;
+    status: BurnOperationStatus;
+    created_at: nat64;
+    completed_at: opt nat64;
+    ethereum_tx_hash: opt text;
+};
+
+// === ICP PAYMENT SYSTEM TYPES ===
+
+type PaymentStatus = variant {
+    Pending;
+    Confirmed;
+    Failed;
+};
+
+type IcpPayment = record {
+    amount_e8s: nat64;
+    user_principal: principal;
+    payment_id: text;
+    timestamp: nat64;
+    status: PaymentStatus;
+};
+
+type SponsorshipStatus = record {
+    can_sponsor: bool;
+    estimated_cost_icp: nat64;
+    estimated_cost_eth: nat64;
+    gas_coverage: text;
+    reserve_health: text;
+};
+
+type TransactionStatus = variant {
+    Pending;
+    Processing;
+    Completed;
+    Failed;
+    Refunded;
+};
+
+type UserTransaction = record {
+    id: text;
+    user_principal: principal;
+    amount_icp: nat64;
+    amount_eth: nat64;
+    destination_address: text;
+    destination_chain: text;
+    status: TransactionStatus;
+    created_at: nat64;
+    completed_at: opt nat64;
+    transaction_hash: opt text;
+    gas_sponsored: nat64;
+    icp_payment_id: text;
+};
+
+type AuditLogEntry = record {
+    id: text;
+    timestamp: nat64;
+    event_type: text;
+    details: text;
+    user_principal: opt principal;
+    admin_principal: opt principal;
+    amount: opt nat64;
+    transaction_hash: opt text;
+};
+
+type ReserveState = record {
+    available_balance: nat64;
+    locked_balance: nat64;
+    total_deposited: nat64;
+    total_withdrawn: nat64;
+    last_updated: nat64;
+    health_status: text;
+    daily_limit: nat64;
+    daily_used: nat64;
+    last_reset: nat64;
+};
+
+type BridgeStatistics = record {
+    total_transactions: nat64;
+    total_settlements: nat64;
+    reserve_balance: nat64;
+    locked_balance: nat64;
+    health_status: text;
+    daily_used: nat64;
+    daily_limit: nat64;
+};
+
+type PriceData = record {
+    asset: text;
+    price_usd: float64;
+    timestamp: nat64;
+    source: text;
+    confidence: float64;
+};
+
+type PriceSource = record {
+    name: text;
+    price_usd: float64;
+    status: text;
+    confidence: float64;
+};
+
+type PriceFeedStatus = record {
+    icp_sources: vec PriceSource;
+    eth_sources: vec PriceSource;
+    last_updated: nat64;
+    cache_status: text;
+};
+
+service : {
+    // === QUOTE GENERATION API ===
+    request_quote: (nat64, text, text) -> (variant { Ok: Quote; Err: text });
+    get_quote: (text) -> (opt Quote);
+    get_user_quotes: () -> (vec Quote);
+    estimate_quote_cost: (nat64) -> (variant { Ok: text; Err: text });
+    
+    // === ICP PAYMENT SYSTEM ===
+    create_icp_payment: (nat64, text, text) -> (variant { Ok: UserTransaction; Err: text });
+    get_sponsorship_status: (nat64, text) -> (variant { Ok: SponsorshipStatus; Err: text });
+    
+    // === USER TRANSACTION HISTORY ===
+    get_user_transactions: () -> (vec UserTransaction);
+    get_user_transaction: (text) -> (opt UserTransaction);
+    
+    // === AUDIT LOGGING ===
+    get_audit_logs: (nat32) -> (vec AuditLogEntry);
+    
+    // === ADMIN RESERVE MANAGEMENT ===
+    add_reserve_funds: (nat64) -> (variant { Ok: text; Err: text });
+    get_bridge_statistics: () -> (BridgeStatistics);
+    get_professional_reserve_status: () -> (ReserveState);
+    
+    // === PRICE INFORMATION API ===
+    get_conversion_rate: () -> (variant { Ok: float64; Err: text });
+    get_icp_price_usd: () -> (variant { Ok: float64; Err: text });
+    get_eth_price_usd: () -> (variant { Ok: float64; Err: text });
+    calculate_icp_cost_for_eth: (nat64) -> (variant { Ok: nat64; Err: text });
+    get_user_icp_balance: () -> (variant { Ok: nat64; Err: text });
+    
+    // === ADVANCED PRICE FEED API ===
+    get_best_icp_price: () -> (variant { Ok: PriceData; Err: text });
+    get_best_eth_price: () -> (variant { Ok: PriceData; Err: text });
+    get_price_feed_status: () -> (variant { Ok: PriceFeedStatus; Err: text });
+    
+    // === AUTOMATIC SETTLEMENT API (OISY PATTERN) ===
+    bridge_assets: (nat64, text, text) -> (variant { Ok: Settlement; Err: text });
+    
+    // === ADMIN & STATUS ===
+    health_check: () -> (text);
+    get_config: () -> (BridgeConfig);
+    update_config: (BridgeConfig) -> (variant { Ok: text; Err: text });
+    add_admin: (principal) -> (variant { Ok: text; Err: text });
+    get_admin_status: () -> (vec principal);
+    
+    // === RESERVE MANAGEMENT ===
+    get_reserve_status: () -> (ReserveStatus);
+    get_detailed_reserve_status: () -> (DetailedReserveStatus);
+    get_reserve_status_formatted: () -> (text);
+    admin_add_reserve_funds: (nat64) -> (variant { Ok: text; Err: text });
+    admin_set_reserve_thresholds: (nat64, nat64) -> (variant { Ok: text; Err: text });
+    admin_set_daily_limit: (nat64) -> (variant { Ok: text; Err: text });
+    admin_emergency_pause: () -> (variant { Ok: text; Err: text });
+    admin_emergency_unpause: () -> (variant { Ok: text; Err: text });
+    add_test_reserve_funds: () -> (text);
+    
+    // === RESERVE MONITORING ===
+    check_reserve_health: () -> (text);
+    get_reserve_utilization: () -> (float64);
+    can_accept_new_quotes: () -> (bool);
+    estimate_reserve_runway: () -> (text);
+    
+    // === SETTLEMENT LOGIC ===
+    settle_quote: (text, text) -> (variant { Ok: Settlement; Err: text });
+    check_quote_expiry: (text) -> (variant { Ok: text; Err: text });
+    get_settlement: (text) -> (opt Settlement);
+    get_user_settlements: () -> (vec Settlement);
+    get_settlement_by_quote: (text) -> (opt Settlement);
+    
+    // === CHAIN-KEY TOKEN OPERATIONS === 🪙
+    create_cketh_mint_operation: (nat64, text) -> (variant { Ok: ChainKeyMintOperation; Err: text });
+    complete_cketh_mint_operation: (text) -> (variant { Ok: text; Err: text });
+    create_cketh_burn_operation: (nat64, text) -> (variant { Ok: ChainKeyBurnOperation; Err: text });
+    complete_cketh_burn_operation: (text) -> (variant { Ok: text; Err: text });
+    test_complete_bridge_flow: () -> (variant { Ok: text; Err: text });
+    
+    // === CHAIN-KEY TOKEN QUERIES === 🪙
+    get_cketh_mint_operation: (text) -> (variant { Ok: ChainKeyMintOperation; Err: text });
+    get_cketh_burn_operation: (text) -> (variant { Ok: ChainKeyBurnOperation; Err: text });
+    get_user_cketh_operations: () -> (record { mint_operations: vec ChainKeyMintOperation; burn_operations: vec ChainKeyBurnOperation });
+    get_chain_key_service_status: () -> (text);
+    get_supported_chain_key_tokens: () -> (text);
+    
+    // === ECDSA & TRANSACTION BUILDING ===
+    get_bridge_ethereum_address: () -> (variant { Ok: text; Err: text });
+    test_threshold_ecdsa_integration: () -> (variant { Ok: text; Err: text });
+    test_transaction_building: () -> (variant { Ok: text; Err: text });
+    get_bridge_status: () -> (variant { Ok: text; Err: text });
+    
+    // === TESTING & DEVELOPMENT ===
+    test_base_rpc: () -> (text);
+    test_settlement_flow: () -> (variant { Ok: text; Err: text });
+    get_settlement_statistics: () -> (text);
+    test_complete_gasless_settlement: () -> (variant { Ok: text; Err: text });
+    test_gasless_bridge_demo: () -> (variant { Ok: text; Err: text });
+    test_enhanced_rpc_client: () -> (variant { Ok: text; Err: text });
+    test_rpc_health_monitoring: () -> (variant { Ok: text; Err: text });
+    
+    // === PERFORMANCE MONITORING ===
+    get_rpc_cache_stats: () -> (text);
+    clear_rpc_cache: () -> (text);
+    invalidate_gas_cache: () -> (text);
+    
+    // === COMPREHENSIVE TESTING ===
+    run_unit_tests: () -> (text);
+    run_integration_tests: () -> (text);
+    run_security_tests: () -> (text);
+    run_edge_case_tests: () -> (text);
+    run_performance_tests: () -> (text);
+    run_comprehensive_test_suite: () -> (text);
+    run_chain_key_token_tests: () -> (text); // 🪙 Chain-key token tests
+};

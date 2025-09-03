@@ -1,0 +1,37 @@
+[package]
+name = "gasless-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Core ICP dependencies
+candid = "0.10"
+ic-cdk = "0.12"
+ic-cdk-timers = "0.6"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+hex = "0.4"
+anyhow = "1.0"
+sha3 = "0.10"
+thiserror = "1.0"
+time = { version = "0.3", features = ["serde", "macros"] }
+toml = "0.8"
+validator = { version = "0.16", features = ["derive"] }
+
+# Ethereum transaction handling
+rlp = "0.5"
+# Use simpler crypto libraries that work with WASM
+libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context"] }
+
+# Stable storage
+ic-stable-structures = "0.6"
+
+# Optional web3 client (for backup)
+ic-web3-rs = { git = "https://github.com/horizonx-tech/ic-web3-rs", optional = true }
